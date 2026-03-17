@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const session = require('express-session');
 const { db, User, Project, Task } = require('./database/setup');
 
 const app = express();
@@ -7,6 +8,12 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+
+app.use(session({
+    secret: 'secret-key',
+    resave: false,
+    saveUninitialized: true
+}));
 
 // Test database connection
 async function testConnection() {
@@ -33,6 +40,33 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
+// POST /api/login - Login user
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ where: { email } });
+
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        req.session.userId = user.id;
+
+        res.json({ message: 'Login successful' });
+
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
 // GET /api/users/:id - Get user by ID
 app.get('/api/users/:id', async (req, res) => {
     try {
@@ -49,15 +83,17 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-// POST /api/users - Create new user
+// POST /api/users - Create new user (now hashed)
 app.post('/api/users', async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
+        const hashedPassword = await bcrypt.hash(password, 10);
+
         const newUser = await User.create({
             username,
             email,
-            password
+            password: hashedPassword
         });
 
         res.status(201).json(newUser);
