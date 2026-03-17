@@ -27,12 +27,24 @@ async function testConnection() {
 
 testConnection();
 
+// AUTH MIDDLEWARE
+function requireAuth(req, res, next) {
+    if (!req.session.userId) {
+        return res.status(401).json({ error: 'Unauthorized: Please log in' });
+    }
+
+    req.user = { id: req.session.userId };
+
+    next();
+}
+
 // USER ROUTES
 
-// GET /api/users - Get all users
 app.get('/api/users', async (req, res) => {
     try {
-        const users = await User.findAll();
+        const users = await User.findAll({
+            attributes: { exclude: ['password'] }
+        });
         res.json(users);
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -40,7 +52,6 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// POST /api/login - Login user
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -67,10 +78,11 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// GET /api/users/:id - Get user by ID
 app.get('/api/users/:id', async (req, res) => {
     try {
-        const user = await User.findByPk(req.params.id);
+        const user = await User.findByPk(req.params.id, {
+            attributes: { exclude: ['password'] }
+        });
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -83,7 +95,6 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-// POST /api/users - Create new user (now hashed)
 app.post('/api/users', async (req, res) => {
     try {
         const { username, email, password } = req.body;
@@ -103,7 +114,6 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// POST /api/register - Register new user
 app.post('/api/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
@@ -130,9 +140,9 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// PROJECT ROUTES
+// PROJECT ROUTES (PROTECTED)
 
-app.get('/api/projects', async (req, res) => {
+app.get('/api/projects', requireAuth, async (req, res) => {
     try {
         const projects = await Project.findAll();
         res.json(projects);
@@ -142,7 +152,7 @@ app.get('/api/projects', async (req, res) => {
     }
 });
 
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', requireAuth, async (req, res) => {
     try {
         const project = await Project.findByPk(req.params.id);
         
@@ -157,16 +167,16 @@ app.get('/api/projects/:id', async (req, res) => {
     }
 });
 
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', requireAuth, async (req, res) => {
     try {
-        const { name, description, status, dueDate, userId } = req.body;
+        const { name, description, status, dueDate } = req.body;
         
         const newProject = await Project.create({
             name,
             description,
             status,
             dueDate,
-            userId
+            userId: req.user.id
         });
         
         res.status(201).json(newProject);
@@ -176,12 +186,12 @@ app.post('/api/projects', async (req, res) => {
     }
 });
 
-app.put('/api/projects/:id', async (req, res) => {
+app.put('/api/projects/:id', requireAuth, async (req, res) => {
     try {
-        const { name, description, status, dueDate, userId } = req.body;
+        const { name, description, status, dueDate } = req.body;
         
         const [updatedRowsCount] = await Project.update(
-            { name, description, status, dueDate, userId },
+            { name, description, status, dueDate },
             { where: { id: req.params.id } }
         );
         
@@ -197,7 +207,7 @@ app.put('/api/projects/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Project.destroy({
             where: { id: req.params.id }
@@ -214,9 +224,9 @@ app.delete('/api/projects/:id', async (req, res) => {
     }
 });
 
-// TASK ROUTES
+// TASK ROUTES (PROTECTED)
 
-app.get('/api/tasks', async (req, res) => {
+app.get('/api/tasks', requireAuth, async (req, res) => {
     try {
         const tasks = await Task.findAll();
         res.json(tasks);
@@ -226,7 +236,7 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
-app.get('/api/tasks/:id', async (req, res) => {
+app.get('/api/tasks/:id', requireAuth, async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
         
@@ -241,7 +251,7 @@ app.get('/api/tasks/:id', async (req, res) => {
     }
 });
 
-app.post('/api/tasks', async (req, res) => {
+app.post('/api/tasks', requireAuth, async (req, res) => {
     try {
         const { title, description, completed, priority, dueDate, projectId } = req.body;
         
@@ -261,7 +271,7 @@ app.post('/api/tasks', async (req, res) => {
     }
 });
 
-app.put('/api/tasks/:id', async (req, res) => {
+app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     try {
         const { title, description, completed, priority, dueDate, projectId } = req.body;
         
@@ -282,7 +292,7 @@ app.put('/api/tasks/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/tasks/:id', async (req, res) => {
+app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Task.destroy({
             where: { id: req.params.id }
