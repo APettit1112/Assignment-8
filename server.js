@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, Project, Task } = require('./database/setup');
+const { db, User, Project, Task } = require('./database/setup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,9 +19,55 @@ async function testConnection() {
 
 testConnection();
 
+// USER ROUTES
+
+// GET /api/users - Get all users
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await User.findAll();
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+// GET /api/users/:id - Get user by ID
+app.get('/api/users/:id', async (req, res) => {
+    try {
+        const user = await User.findByPk(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(user);
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    }
+});
+
+// POST /api/users - Create new user
+app.post('/api/users', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+
+        const newUser = await User.create({
+            username,
+            email,
+            password
+        });
+
+        res.status(201).json(newUser);
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
 // PROJECT ROUTES
 
-// GET /api/projects - Get all projects
 app.get('/api/projects', async (req, res) => {
     try {
         const projects = await Project.findAll();
@@ -32,7 +78,6 @@ app.get('/api/projects', async (req, res) => {
     }
 });
 
-// GET /api/projects/:id - Get project by ID
 app.get('/api/projects/:id', async (req, res) => {
     try {
         const project = await Project.findByPk(req.params.id);
@@ -48,16 +93,16 @@ app.get('/api/projects/:id', async (req, res) => {
     }
 });
 
-// POST /api/projects - Create new project
 app.post('/api/projects', async (req, res) => {
     try {
-        const { name, description, status, dueDate } = req.body;
+        const { name, description, status, dueDate, userId } = req.body;
         
         const newProject = await Project.create({
             name,
             description,
             status,
-            dueDate
+            dueDate,
+            userId
         });
         
         res.status(201).json(newProject);
@@ -67,13 +112,12 @@ app.post('/api/projects', async (req, res) => {
     }
 });
 
-// PUT /api/projects/:id - Update existing project
 app.put('/api/projects/:id', async (req, res) => {
     try {
-        const { name, description, status, dueDate } = req.body;
+        const { name, description, status, dueDate, userId } = req.body;
         
         const [updatedRowsCount] = await Project.update(
-            { name, description, status, dueDate },
+            { name, description, status, dueDate, userId },
             { where: { id: req.params.id } }
         );
         
@@ -89,7 +133,6 @@ app.put('/api/projects/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/projects/:id - Delete project
 app.delete('/api/projects/:id', async (req, res) => {
     try {
         const deletedRowsCount = await Project.destroy({
@@ -109,7 +152,6 @@ app.delete('/api/projects/:id', async (req, res) => {
 
 // TASK ROUTES
 
-// GET /api/tasks - Get all tasks
 app.get('/api/tasks', async (req, res) => {
     try {
         const tasks = await Task.findAll();
@@ -120,7 +162,6 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
-// GET /api/tasks/:id - Get task by ID
 app.get('/api/tasks/:id', async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
@@ -136,7 +177,6 @@ app.get('/api/tasks/:id', async (req, res) => {
     }
 });
 
-// POST /api/tasks - Create new task
 app.post('/api/tasks', async (req, res) => {
     try {
         const { title, description, completed, priority, dueDate, projectId } = req.body;
@@ -157,7 +197,6 @@ app.post('/api/tasks', async (req, res) => {
     }
 });
 
-// PUT /api/tasks/:id - Update existing task
 app.put('/api/tasks/:id', async (req, res) => {
     try {
         const { title, description, completed, priority, dueDate, projectId } = req.body;
@@ -179,11 +218,10 @@ app.put('/api/tasks/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/tasks/:id - Delete task
 app.delete('/api/tasks/:id', async (req, res) => {
     try {
         const deletedRowsCount = await Task.destroy({
-        where: { id: req.params.id }
+            where: { id: req.params.id }
         });
         
         if (deletedRowsCount === 0) {
