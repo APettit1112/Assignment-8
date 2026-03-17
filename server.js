@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcrypt');
 const { db, User, Project, Task } = require('./database/setup');
 
 const app = express();
@@ -63,6 +64,33 @@ app.post('/api/users', async (req, res) => {
     } catch (error) {
         console.error('Error creating user:', error);
         res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
+// POST /api/register - Register new user
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+
+        const existingUser = await User.findOne({ where: { email } });
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already in use' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = await User.create({
+            username,
+            email,
+            password: hashedPassword
+        });
+
+        res.status(201).json({ message: 'User registered successfully', user: newUser });
+
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Failed to register user' });
     }
 });
 
